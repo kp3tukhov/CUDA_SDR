@@ -1,0 +1,1 @@
+/opt/nvidia/hpc_sdk/Linux_x86_64/26.3/cuda/13.1/bin/nvcc -forward-unknown-to-host-compiler  -O3 -arch=native -Xcompiler=-fPIC -Wno-deprecated-gpu-targets -shared -dlink --options-file CMakeFiles/acq_sig.dir/deviceObjects1.rsp -o CMakeFiles/acq_sig.dir/cmake_device_link.o --options-file CMakeFiles/acq_sig.dir/deviceLinkLibs.rsp

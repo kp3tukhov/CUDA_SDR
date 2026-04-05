@@ -1,0 +1,6 @@
+/home/kirill/Documents/CUDA_SDR/build/CMakeFiles/cuda_mixers.dir
+/home/kirill/Documents/CUDA_SDR/build/CMakeFiles/gen_sig.dir
+/home/kirill/Documents/CUDA_SDR/build/CMakeFiles/corr_sig.dir
+/home/kirill/Documents/CUDA_SDR/build/CMakeFiles/acq_sig.dir
+/home/kirill/Documents/CUDA_SDR/build/CMakeFiles/edit_cache.dir
+/home/kirill/Documents/CUDA_SDR/build/CMakeFiles/rebuild_cache.dir

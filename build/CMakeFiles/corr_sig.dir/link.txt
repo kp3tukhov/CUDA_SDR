@@ -1,0 +1,1 @@
+/usr/bin/g++ @CMakeFiles/corr_sig.dir/objects1.rsp CMakeFiles/corr_sig.dir/cmake_device_link.o -o /home/kirill/Documents/CUDA_SDR/corr_sig @CMakeFiles/corr_sig.dir/linkLibs.rsp -L"/opt/nvidia/hpc_sdk/Linux_x86_64/26.3/cuda/13.1/targets/x86_64-linux/lib/stubs" -L"/opt/nvidia/hpc_sdk/Linux_x86_64/26.3/cuda/13.1/targets/x86_64-linux/lib"
