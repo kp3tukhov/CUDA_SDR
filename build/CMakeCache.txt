@@ -441,12 +441,6 @@ GPS_Signal_Processing_SOURCE_DIR:STATIC=/home/kirill/Documents/CUDA_SDR
 //Path to a library.
 MATH_LIB:FILEPATH=/usr/lib/x86_64-linux-gnu/libm.so
 
-//Arguments to supply to pkg-config
-PKG_CONFIG_ARGN:STRING=
-
-//pkg-config executable
-PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
-
 
 ########################
 # INTERNAL cache entries
@@ -743,14 +737,8 @@ CUDA_nvrtc_static_LIBRARY-ADVANCED:INTERNAL=1
 CUDA_pcsamplingutil_LIBRARY-ADVANCED:INTERNAL=1
 //Details about finding CUDAToolkit
 FIND_PACKAGE_MESSAGE_DETAILS_CUDAToolkit:INTERNAL=[/opt/nvidia/hpc_sdk/Linux_x86_64/26.3/cuda/13.1/targets/x86_64-linux/include][/opt/nvidia/hpc_sdk/Linux_x86_64/26.3/cuda/13.1/lib64/libcudart.so][/opt/nvidia/hpc_sdk/Linux_x86_64/26.3/cuda/13.1/bin][v13.1.115()]
-//Details about finding PkgConfig
-FIND_PACKAGE_MESSAGE_DETAILS_PkgConfig:INTERNAL=[/usr/bin/pkg-config][v1.8.1()]
 //Details about finding Threads
 FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
-//ADVANCED property for variable: PKG_CONFIG_ARGN
-PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
-PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
 //linker supports push/pop state
 _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
 

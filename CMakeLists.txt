@@ -17,7 +17,6 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O3 -ffast-math -march=native"
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")
 
 # Поиск зависимостей
-find_package(PkgConfig REQUIRED)
 find_library(FFTW3F_LIB fftw3f REQUIRED)
 find_library(MATH_LIB m REQUIRED)
 

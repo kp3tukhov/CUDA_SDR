@@ -93,7 +93,6 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/usr/share/cmake-3.28/Modules/FindCUDAToolkit.cmake"
   "/usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake"
   "/usr/share/cmake-3.28/Modules/FindPackageMessage.cmake"
-  "/usr/share/cmake-3.28/Modules/FindPkgConfig.cmake"
   "/usr/share/cmake-3.28/Modules/FindThreads.cmake"
   "/usr/share/cmake-3.28/Modules/Internal/CMakeCUDAArchitecturesAll.cmake"
   "/usr/share/cmake-3.28/Modules/Internal/CMakeCUDAArchitecturesNative.cmake"
