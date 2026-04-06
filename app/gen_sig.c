@@ -134,8 +134,6 @@ void generate_L1CA_signal(
             int prn_idx = sats[s].prn - 1;
 
             int idx_chip = (int)round(current_chip_index[prn_idx]);
-            if (idx_chip >= GPS_CODE_LEN) idx_chip = 0;
-            if (idx_chip < 0) idx_chip = GPS_CODE_LEN - 1;
 
             int code_val = prn_codes[prn_idx][idx_chip];
 

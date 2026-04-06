@@ -67,7 +67,7 @@ static void print_result_header(void) {
     printf("==================================================================\n");
     printf("                  GPS SIGNAL ACQUISITION RESULTS                  \n");
     printf("==================================================================\n");
-    printf(" PRN | Status | C/N0 (dB-Hz) | Doppler (Hz) | Code Phase (chips) |\n");
+    printf(" PRN | Status | C/N0 (dB-Hz) | Doppler (Hz) | Code Offset (ms)   |\n");
     printf("-----+--------+--------------+--------------+--------------------+\n");
 }
 
@@ -81,7 +81,7 @@ static void print_result_row(const satellite_channel_t *result) {
             result->active ? "FOUND" : "----",
             result->cn0_db_hz,
             result->fdoppler,
-            result->code_phase_start_chips);
+            result->code_phase_start_chips/GPS_CODE_LEN);
 
 }
 

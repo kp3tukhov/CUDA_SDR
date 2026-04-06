@@ -45,7 +45,7 @@ void corr_sequential(
     float complex *code_buf = (float complex *) malloc(sizeof(float complex) * N);
     float complex *sig_buf = (float complex *) malloc(sizeof(float complex) * N);
 
-    // Search code offset (chips)
+    // Search code start chip
     for (int c = 0; c < GPS_CODE_LEN; c++) {
 
         // Make ADC code representation (starting with chip c)
@@ -64,8 +64,8 @@ void corr_sequential(
             float re = crealf(sum);
             float im = cimagf(sum);
             
-            int c_offset = c;                                     // If so, res is code start phase
-            //int c_offset = (GPS_CODE_LEN - c) % GPS_CODE_LEN;       // If so, res is code offset
+            //int c_offset = c;                                     // If so, res is code start phase
+            int c_offset = (GPS_CODE_LEN - c) % GPS_CODE_LEN;       // If so, res is code offset
 
             // Compute power (with accumulation support)
             corr_map[d * GPS_CODE_LEN + c_offset] += (double) (re * re + im * im);
@@ -110,7 +110,7 @@ void corr_parallel_freq(
     int f_sign = recv->iq ? -1 : 1;
     double df = recv->f_adc / fft_size;
 
-    // Search code offset (chips)
+    // Search code start chip
     for (int c = 0; c < GPS_CODE_LEN; c++) {
 
         // Make ADC code representation (starting with chip c)
@@ -139,8 +139,8 @@ void corr_parallel_freq(
             float re = out[freq_bin][0];
             float im = out[freq_bin][1];
 
-            int c_offset = c;                                     // If so, res is code start phase
-            //int c_offset = (GPS_CODE_LEN - c) % GPS_CODE_LEN;       // If so, res is code offset
+            //int c_offset = c;                                     // If so, res is code start phase
+            int c_offset = (GPS_CODE_LEN - c) % GPS_CODE_LEN;       // If so, res is code offset
 
             // Compute power (with accumulation support)
             corr_map[d * GPS_CODE_LEN + c_offset] += (double) (re * re + im * im);
@@ -239,8 +239,8 @@ void corr_parallel_code(
             float re = corr_ifft[s][0] / fft_size;
             float im = corr_ifft[s][1] / fft_size;
 
-            //int c_offset = s;               // If so, res is code offset
-            int c_offset = (N - s) % N;       // If so, res is code start phase
+            int c_offset = s;               // If so, res is code offset
+            //int c_offset = (N - s) % Т;       // If so, res is code start phase
 
             // Compute power (with accumulation support)
             corr_map[d * N + c_offset] += (double) (re * re + im * im);
