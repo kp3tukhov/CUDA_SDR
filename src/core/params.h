@@ -1,6 +1,10 @@
 #ifndef PARAMS_H
 #define PARAMS_H
 
+#define M_PI 3.14159265358979323846
+
+#define CUDA_BLOCK_SIZE 512         // Default thread block size for GPU
+
 
 /* 
  * ============================================================================

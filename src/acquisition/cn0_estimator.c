@@ -14,11 +14,6 @@
 #include "core/types.h"
 #include "acquisition/cn0_estimator.h"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-
 
 double estimate_noise_floor(
     const double *corr_map,

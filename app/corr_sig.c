@@ -24,6 +24,7 @@
 #include "core/utils.h"
 #include "dsp/code.h"
 #include "correlator/corr_interface.h"
+#include "correlator/corr_interface_gpu.cuh"
 #include "io/file_io.h"
 #include "io/config_io.h"
 
@@ -48,9 +49,13 @@ void print_usage(const char *prog_name) {
     printf("                          1: Time Domain (Brute Force)\n");
     printf("                          2: Parallel Frequency Search\n");
     printf("                          3: Parallel Code Search (FFT, Default)\n");
+    printf("  --device <cpu|gpu>      Execution device (default: cpu).\n");
+    printf("                          Note: GPU is only supported for method 3.\n");
+    printf("                          If method 1 or 2 is selected with --device gpu,\n");
+    printf("                          a warning will be printed and CPU will be used.\n");
     printf("  -h, --help              Show this help message.\n");
     printf("Example:\n");
-    printf("  %s -f test_iq.bin --prn 5 --tint 10 -o test.dat --iq --method=3 \n", prog_name);
+    printf("  %s -f test_iq.bin --prn=5 --tint=10 --iq --method=3 --device=gpu -o test.dat \n", prog_name);
 }
 
 
@@ -67,6 +72,7 @@ int main(int argc, char *argv[]) {
     double t_int = DEFAULT_T_INT_MS;
     int is_iq = 0;
     int method = METHOD_PARALLEL_CODE;
+    device_t device = DEVICE_CPU;
 
     static struct option long_options[] = {
         {"file",         required_argument, 0, 'f'},
@@ -78,6 +84,7 @@ int main(int argc, char *argv[]) {
         {"tintegration", required_argument, 0, 't'},
         {"iq",           no_argument,       0, 'q'},
         {"method",       required_argument, 0, 'k'},
+        {"device",       required_argument, 0, 'd'},
         {"help",         no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
@@ -85,7 +92,7 @@ int main(int argc, char *argv[]) {
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long(argc, argv, "f:p:o:m:x:s:t:q:k:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:p:o:m:x:s:t:q:k:d:h", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'f': input_file = optarg; break;
             case 'p': prn = atoi(optarg); break;
@@ -96,6 +103,13 @@ int main(int argc, char *argv[]) {
             case 't': t_int = atof(optarg); break;
             case 'q': is_iq = 1; break;
             case 'k': method = atoi(optarg); break;
+            case 'd':
+                if (strcmp(optarg, "gpu") == 0) {
+                    device = DEVICE_GPU;
+                } else {
+                    device = DEVICE_CPU;
+                }
+                break;
             case 'h':
                 print_usage(argv[0]);
                 return EXIT_SUCCESS;
@@ -144,6 +158,7 @@ int main(int argc, char *argv[]) {
         case METHOD_PARALLEL_CODE: printf("(Parallel Code)\n"); break;
         default: printf("(Unknown)\n");
     }
+    printf("Device:          %s\n", device == DEVICE_GPU ? "GPU" : "CPU");
     printf("=====================================\n");
 
     double t_start_load = get_time_sec();
@@ -160,7 +175,7 @@ int main(int argc, char *argv[]) {
     printf("[PROFILING] Data loading time: %.4f seconds\n", t_end_load - t_start_load);
 
     // Generate local PRN code
-    int8_t *local_code = (int8_t*) malloc(sizeof(int8_t) * GPS_CODE_LEN);
+    int8_t *local_code = (int8_t *)malloc(sizeof(int8_t) * GPS_CODE_LEN);
     if (!local_code) {
         fprintf(stderr, "Error: Failed to allocate code buffer.\n");
         free(signal_buffer);
@@ -173,7 +188,7 @@ int main(int argc, char *argv[]) {
     int n_rows = (int)round((dop_max - dop_min) / dop_step);
     int n_cols = (method == METHOD_PARALLEL_CODE) ? n_samples_per_period : GPS_CODE_LEN;
 
-    double *result_map = (double*)malloc(sizeof(double) * n_rows * n_cols);
+    double *result_map = (double *)malloc(sizeof(double) * n_rows * n_cols);
 
     if (!result_map) {
         fprintf(stderr, "Error: Failed to allocate result map.\n");
@@ -199,12 +214,28 @@ int main(int argc, char *argv[]) {
     printf("Starting correlation...\n");
     double t_start_corr = get_time_sec();
 
-    // Execute correlation via unified interface
-    int ret = batch_corr_execute(
-        signal_buffer,
-        local_code, &config, &recv,
-        &result_map
-    );
+    // Check if GPU is requested but method is not parallel code
+    int use_gpu = (device == DEVICE_GPU && method == METHOD_PARALLEL_CODE);
+
+    int ret;
+    if (use_gpu) {
+        printf("Using GPU acceleration (method 3 - Parallel Code).\n");
+        ret = batch_corr_execute_cuda(
+            (const cuFloatComplex*) signal_buffer,
+            local_code, &config, &recv,
+            &result_map
+        );
+    } else {
+        if (device == DEVICE_GPU) {
+            fprintf(stderr, "Warning: GPU is only implemented for method 3 (Parallel Code Search).\n");
+            fprintf(stderr, "         Falling back to CPU for method %d.\n", method);
+        }
+        ret = batch_corr_execute(
+            signal_buffer,
+            local_code, &config, &recv,
+            &result_map
+        );
+    }
 
     double t_end_corr = get_time_sec();
     printf("[PROFILING] Correlation execution time: %.4f seconds\n", t_end_corr - t_start_corr);

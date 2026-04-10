@@ -13,8 +13,15 @@ set(CMAKE_CUDA_ARCHITECTURES native)
 # Компилятор C и флаги
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O3 -ffast-math -march=native")
 
-# CUDA флаги
+# CUDA флаки
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")
+
+# Опция для включения профилирования GPU коррелятора
+option(CORR_GPU_PROFILING "Enable GPU correlator profiling" OFF)
+if(CORR_GPU_PROFILING)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DCORR_GPU_PROFILING")
+    message(STATUS "GPU correlator profiling ENABLED")
+endif()
 
 # Поиск зависимостей
 find_library(FFTW3F_LIB fftw3f REQUIRED)
@@ -53,6 +60,12 @@ set(DSP_SRCS
 # === Исходники DSP CUDA ===
 set(DSP_CUDA_SRCS
     ${SRC_DIR}/dsp/mixer_gpu.cu
+    ${SRC_DIR}/dsp/code_gpu.cu
+)
+
+# === Исходники коррелятора CUDA ===
+set(CORR_CUDA_SRCS
+    ${SRC_DIR}/correlator/corr_interface_gpu.cu
 )
 
 # === Исходники IO ===
@@ -77,12 +90,14 @@ set(ACQ_SRCS
 
 # === CUDA библиотека (отдельная static library) ===
 # Важно: CUDA файлы должны компилироваться отдельно
-add_library(cuda_mixers STATIC ${DSP_CUDA_SRCS})
+add_library(cuda_mixers STATIC ${DSP_CUDA_SRCS} ${CORR_CUDA_SRCS})
 set_target_properties(cuda_mixers PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     POSITION_INDEPENDENT_CODE ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 target_include_directories(cuda_mixers PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_link_libraries(cuda_mixers PUBLIC CUDA::cufft)
 
 # === gen_sig (без CUDA) ===
 add_executable(gen_sig

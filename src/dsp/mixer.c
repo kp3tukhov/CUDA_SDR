@@ -3,21 +3,17 @@
  * 
  * This module provides functions for frequency mixing (down-conversion)
  * and complex vector operations used in GPS signal processing
- * Includes optimized phase lookup table (LUT) for carrier mixing
+ * Includes cached phase lookup table (LUT) for carrier mixing
  */
 
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
-
 #include <complex.h>
+
 #include "core/params.h"
 #include "core/types.h"
 #include "dsp/mixer.h"
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 
 #define PHASE_LUT_SIZE 65536  // 2^16
@@ -32,8 +28,9 @@ static inline void init_phase_lut(void) {
 
     for (int i = 0; i < PHASE_LUT_SIZE; i++) {
         double phase = 2.0 * M_PI * i / PHASE_LUT_SIZE;
-        phase_lut[i] = cosf((float) phase) + I * sinf((float) phase);
+        phase_lut[i] = cosf((float)phase) + I * sinf((float)phase);
     }
+
     lut_initialized = 1;
 }
 
@@ -48,13 +45,12 @@ void mix_freq(
     init_phase_lut();
 
     // Phase increment per sample (scaled to LUT indices)
-    uint16_t phase_step_lut = (uint16_t) round((freq / recv->f_adc) * PHASE_LUT_SIZE);
-    uint16_t current_phase = 0;
+    uint16_t phase_step_lut = (uint16_t)round((freq / recv->f_adc) * PHASE_LUT_SIZE);
 
     for (int i = 0; i < size; i++) {
+        uint16_t current_phase = (uint16_t)(phase_step_lut * i); // Overflow wraps phase automatically
+        
         signal_out[i] = signal_in[i]*phase_lut[current_phase];
-
-        current_phase += phase_step_lut; // Overflow wraps phase automatically
 
     }
 }

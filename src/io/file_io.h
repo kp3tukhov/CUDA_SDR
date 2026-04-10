@@ -12,13 +12,6 @@
 #include "core/types.h"
 
 
-// Signal data format enumeration
-typedef enum {
-    DATA_FORMAT_I,   // I-channel only (real signal)
-    DATA_FORMAT_IQ   // Complex IQ samples (interleaved)
-} data_format_t;
-
-
 /*
  * Read signal data from a binary file
  * Supports both I-only and IQ formats (int8_t samples)

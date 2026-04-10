@@ -25,7 +25,12 @@
  *   n_samples  - Number of samples to generate
  *   start_chip - Starting chip position (0-1022)
  */
-void gen_code_L1CA(int prn, int8_t *buffer, int n_samples, int start_chip);
+void gen_code_L1CA(
+    int prn,
+    int8_t *buffer,
+    int n_samples,
+    int start_chip
+);
 
 /*
  * Sample the generated code for FFT processing

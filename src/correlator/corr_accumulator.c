@@ -34,7 +34,7 @@ void corr_accumulate_noncoherent(
     )
 ) {
 
-    int N = (int) round(recv->f_adc * (CODE_PERIOD_MS / 1000.0));
+    int N = (int)round(recv->f_adc * (CODE_PERIOD_MS / 1000.0));
 
     int n_rows = cfg->n_dop;
     int n_cols = (cfg->method == METHOD_PARALLEL_CODE) ? N : GPS_CODE_LEN;

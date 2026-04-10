@@ -59,7 +59,12 @@ static inline uint16_t lfsr_step_g2(uint16_t state) {
 
 
 
-void gen_code_L1CA(int prn, int8_t *buffer, int n_samples, int start_chip) {
+void gen_code_L1CA(
+    int prn,
+    int8_t *buffer,
+    int n_samples,
+    int start_chip
+) {
 
     if (prn < 1 || prn > 37 || buffer == NULL) return;
 
@@ -116,7 +121,7 @@ void sample_code(
     int i = 0;
     for (; i < N; i++) {
         // Write to I-channel, Q = 0
-        code_sampled[i] = (float) code[(int) curr_chip] + I*0.0f;
+        code_sampled[i] = (float)code[(int)curr_chip] + I*0.0f;
 
         curr_chip += chip_step;
         if (curr_chip >= GPS_CODE_LEN) curr_chip -= GPS_CODE_LEN;

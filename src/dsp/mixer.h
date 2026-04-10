@@ -3,7 +3,7 @@
  * 
  * This header provides functions for frequency mixing (down-conversion)
  * and complex vector operations used in GPS signal processing
- * Includes optimized phase lookup table (LUT) for carrier mixing
+ * Includes cached phase lookup table (LUT) for carrier mixing
  */
 
 #ifndef DSP_MIXER_H

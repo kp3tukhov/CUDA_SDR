@@ -23,6 +23,7 @@
 #include "core/utils.h"
 #include "dsp/code.h"
 #include "correlator/corr_interface.h"
+#include "correlator/corr_interface_gpu.cuh"
 #include "io/file_io.h"
 #include "io/config_io.h"
 #include "acquisition/acq_processor.h"
@@ -49,6 +50,10 @@ static void print_usage(const char *prog_name) {
     printf("                              1: Time Domain (Brute Force)\n");
     printf("                              2: Parallel Frequency Search\n");
     printf("                              3: Parallel Code Search (FFT, Default)\n");
+    printf("  --device <cpu|gpu>          Execution device (default: cpu).\n");
+    printf("                              Note: GPU is only supported for method 3.\n");
+    printf("                              If method 1 or 2 is selected with --device gpu,\n");
+    printf("                              a warning will be printed and CPU will be used.\n");
     printf("  --prn <num>                 Search only specified PRN (1-37). If not specified, scan all.\n");
     printf("  --threshold <cn0>           Detection threshold (C/N0 in dB-Hz). (Default: %.1f)\n", DEFAULT_THRESHOLD_DB);
     printf("  -h, --help                  Show this help message.\n");
@@ -56,7 +61,7 @@ static void print_usage(const char *prog_name) {
     printf("  Table of detected satellites with parameters:\n");
     printf("  PRN | Status | C/N0 (dB-Hz) | Doppler (Hz) | Code Phase (chips)\n");
     printf("Example:\n");
-    printf("  %s -f test_iq.bin --tint=10 --iq --method 3 --threshold 35 \n", prog_name);
+    printf("  %s -f test_iq.bin --tint=10 --iq --method=3 --device=gpu --threshold=35 \n", prog_name);
 }
 
 /*
@@ -116,6 +121,7 @@ static int acquire_batch_prn(
     double dop_step,
     double t_integration_ms,
     correlator_method_t method,
+    device_t device,
     double threshold_db,
     satellite_channel_t *results
 ) {
@@ -126,7 +132,7 @@ static int acquire_batch_prn(
     int num_prns = prn_end - prn_start + 1;
 
     // Allocate memory for code array (all codes concatenated)
-    int8_t *local_codes = (int8_t*)malloc(sizeof(int8_t) * GPS_CODE_LEN * num_prns);
+    int8_t *local_codes = (int8_t *)malloc(sizeof(int8_t) * GPS_CODE_LEN * num_prns);
     if (!local_codes) {
         fprintf(stderr, "Error: Failed to allocate memory for local codes.\n");
         return -1;
@@ -142,7 +148,7 @@ static int acquire_batch_prn(
     int n_rows = (int)round((dop_max - dop_min) / dop_step);
     int n_cols = (method == METHOD_PARALLEL_CODE) ? n_samples_per_period : GPS_CODE_LEN;
 
-    double **corr_maps = (double**)malloc(sizeof(double*) * num_prns);
+    double **corr_maps = (double **)malloc(sizeof(double *) * num_prns);
 
     if (!corr_maps) {
         fprintf(stderr, "Error: Failed to allocate memory for correlation maps pointer array.\n");
@@ -151,7 +157,7 @@ static int acquire_batch_prn(
     }
 
     for (int i = 0; i < num_prns; i++) {
-        corr_maps[i] = (double*)malloc(sizeof(double) * n_rows * n_cols);
+        corr_maps[i] = (double *)malloc(sizeof(double) * n_rows * n_cols);
         if (!corr_maps[i]) {
             fprintf(stderr, "Error: Failed to allocate memory for correlation map %d.\n", i);
             for (int j = 0; j < i; j++) {
@@ -182,11 +188,26 @@ static int acquire_batch_prn(
     }
 
     // Execute batch correlation
-    int ret = batch_corr_execute(
-        signal,
-        local_codes, &config, recv,
-        corr_maps
-    );
+    int use_gpu = (device == DEVICE_GPU && method == METHOD_PARALLEL_CODE);
+    int ret;
+
+    if (use_gpu) {
+        ret = batch_corr_execute_cuda(
+            (const cuFloatComplex*) signal,
+            local_codes, &config, recv,
+            corr_maps
+        );
+    } else {
+        if (device == DEVICE_GPU) {
+            fprintf(stderr, "Warning: GPU is only implemented for method 3 (Parallel Code Search).\n");
+            fprintf(stderr, "         Falling back to CPU for method %d.\n", method);
+        }
+        ret = batch_corr_execute(
+            signal,
+            local_codes, &config, recv,
+            corr_maps
+        );
+    }
 
     if (ret != 0) {
         fprintf(stderr, "Error: batch_corr_execute failed.\n");
@@ -240,6 +261,7 @@ int main(int argc, char *argv[]) {
     double doppler_step = DEFAULT_DOP_STEP;
     double t_integration_ms = DEFAULT_T_INT_MS;
     correlator_method_t method = METHOD_PARALLEL_CODE;
+    device_t device = DEVICE_CPU;
     int specific_prn = -1;  // -1 = scan all
     double threshold_db = DEFAULT_THRESHOLD_DB;
 
@@ -252,6 +274,7 @@ int main(int argc, char *argv[]) {
         {"tintegration", required_argument, 0, 't'},
         {"iq",           no_argument,       0, 'i'},
         {"method",       required_argument, 0, 'M'},
+        {"device",       required_argument, 0, 'v'},
         {"prn",          required_argument, 0, 'p'},
         {"threshold",    required_argument, 0, 'T'},
         {"help",         no_argument,       0, 'h'},
@@ -261,7 +284,7 @@ int main(int argc, char *argv[]) {
     int opt;
     int option_index = 0;
     
-    while ((opt = getopt_long(argc, argv, "f:d:m:s:t:iM:p:T:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:d:m:s:t:iM:v:p:T:h", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'f':
                 input_file = optarg;
@@ -288,9 +311,16 @@ int main(int argc, char *argv[]) {
                     else if (m == 2) method = METHOD_PARALLEL_FREQ;
                     else if (m == 3) method = METHOD_PARALLEL_CODE;
                     else {
-                        fprintf(stderr, "Error: Invalid method %d. Use 1, 2, or 3.\n", m);
+                        fprintf(stderr, "Error: Invalid method %d. Use 1, 2 or 3.\n", m);
                         return 1;
                     }
+                }
+                break;
+            case 'v':
+                if (strcmp(optarg, "gpu") == 0) {
+                    device = DEVICE_GPU;
+                } else {
+                    device = DEVICE_CPU;
                 }
                 break;
             case 'p':
@@ -370,6 +400,7 @@ int main(int argc, char *argv[]) {
         doppler_min, doppler_max, doppler_step,
         t_integration_ms,
         method,
+        device,
         threshold_db,
         results
     );

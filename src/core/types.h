@@ -13,6 +13,21 @@
 #include <complex.h>
 #include "params.h"
 
+
+/* 
+ * ============================================================================
+ * GENERAL
+ * ============================================================================
+ */
+
+// Correlation device
+typedef enum {
+    DEVICE_CPU = 1,          // CPU correlation pipeline
+    DEVICE_GPU,              // GPU correlation pipeline
+    DEVICE_JETSON,           // Nvidia Jetson (it has shared RAM) correlation pipeline, TODO
+} device_t;
+
+
 /* 
  * ============================================================================
  * SATELLITE
@@ -56,7 +71,7 @@ typedef struct {
 typedef enum {
     METHOD_TIME_DOMAIN = 1,     // Sequential time-domain correlation
     METHOD_PARALLEL_FREQ,       // Parallel frequency-domain (FFT-based)
-    METHOD_PARALLEL_CODE        // Parallel code-domain (FFT-based)
+    METHOD_PARALLEL_CODE,       // Parallel code-domain (FFT-based)
 } correlator_method_t;
 
 // Correlator configuration parameters
