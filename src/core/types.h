@@ -81,6 +81,7 @@ typedef struct {
     int n_dop;                      // Number of Doppler bins
     int num_periods;                // Number of code periods for accumulation
     correlator_method_t method;     // Correlation method
+    device_t device;                // Device to run correlation on
     int prns[MAX_SATS];             // PRN numbers to process
     int num_prns;                   // Number of PRNs
     int verbose;                    // Verbose output flag

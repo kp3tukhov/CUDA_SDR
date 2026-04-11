@@ -13,9 +13,64 @@
 
 #include "core/params.h"
 #include "core/types.h"
-#include "correlator/correlator.h"
-#include "correlator/corr_accumulator.h"
 #include "correlator/corr_interface.h"
+#include "correlator/correlator.h"
+#include "correlator/correlator_gpu.cuh"
+
+
+/*
+ * Dispatcher function for non-coherent correlation accumulation
+ * Calls the correlation function for each code period and accumulates power
+ *
+ * Parameters:
+ *   signal      - Input signal buffer (contains multiple periods)
+ *   local_code  - Generated local PRN code (+1/-1 values)
+ *   recv        - Receiver configuration
+ *   cfg         - Correlator configuration (includes num_periods)
+ *   corr_map    - Output correlation map (accumulated power)
+ *   corr_func   - Pointer to correlation function to use
+ */
+static void corr_accumulate_noncoherent(
+    const float complex *signal,
+    const int8_t *local_code,
+    const receiver_t *recv,
+    const correlator_config_t *cfg,
+    double *corr_map,
+    void (*corr_func)(
+        const float complex *signal,
+        const int8_t *local_code,
+        const receiver_t *recv,
+        const correlator_config_t *cfg,
+        double *corr_map
+    )
+) {
+
+    int N = (int)round(recv->f_adc * (CODE_PERIOD_MS / 1000.0));
+
+    int n_rows = cfg->n_dop;
+    int n_cols = (cfg->method == METHOD_PARALLEL_CODE) ? N : GPS_CODE_LEN;
+
+    // Zero the correlation map
+    memset(corr_map, 0, sizeof(double) * n_rows * n_cols);
+
+    if (cfg->verbose) {
+        const char *method_names[] = {
+            [METHOD_TIME_DOMAIN] = "Time Domain",
+            [METHOD_PARALLEL_FREQ] = "Parallel Frequency",
+            [METHOD_PARALLEL_CODE] = "Parallel Code"
+        };
+        printf("Starting non-coherent accumulation (%s method, %d periods)...\n",
+               method_names[cfg->method], cfg->num_periods);
+    }
+
+    // Main accumulation loop over code periods
+    for (int p = 0; p < cfg->num_periods; p++) {
+
+        const float complex *sig_ptr = signal + (p * N);
+        corr_func(sig_ptr, local_code, recv, cfg, corr_map);
+
+    }
+}
 
 
 int batch_corr_execute(
@@ -31,6 +86,23 @@ int batch_corr_execute(
 
     if (config->num_prns <= 0 || config->num_prns > MAX_SATS) {
         return -1;
+    }
+
+    if (config->device == DEVICE_GPU) {
+        if (config->verbose && config->method != 3) {
+            fprintf(stderr, "Warning: GPU is only implemented for method 3 (Parallel Code Search).\n");
+            fprintf(stderr, "         Switchig to method 3\n");
+        }
+
+        batch_corr_execute_cuda(
+            (const cuFloatComplex*) signal,
+            local_code,
+            config,
+            recv,
+            corr_maps
+        );
+
+        return 0;
     }
 
     // Select correlation function based on method

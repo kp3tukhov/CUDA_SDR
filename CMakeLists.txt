@@ -65,7 +65,7 @@ set(DSP_CUDA_SRCS
 
 # === Исходники коррелятора CUDA ===
 set(CORR_CUDA_SRCS
-    ${SRC_DIR}/correlator/corr_interface_gpu.cu
+    ${SRC_DIR}/correlator/correlator_gpu.cu
 )
 
 # === Исходники IO ===
@@ -78,7 +78,6 @@ set(IO_SRCS
 set(CORR_SRCS
     ${SRC_DIR}/correlator/correlator.c
     ${SRC_DIR}/correlator/corr_interface.c
-    ${SRC_DIR}/correlator/corr_accumulator.c
 )
 
 # === Исходники acquisition ===

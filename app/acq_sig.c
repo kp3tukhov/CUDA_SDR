@@ -23,7 +23,6 @@
 #include "core/utils.h"
 #include "dsp/code.h"
 #include "correlator/corr_interface.h"
-#include "correlator/corr_interface_gpu.cuh"
 #include "io/file_io.h"
 #include "io/config_io.h"
 #include "acquisition/acq_processor.h"
@@ -53,7 +52,7 @@ static void print_usage(const char *prog_name) {
     printf("  --device <cpu|gpu>          Execution device (default: cpu).\n");
     printf("                              Note: GPU is only supported for method 3.\n");
     printf("                              If method 1 or 2 is selected with --device gpu,\n");
-    printf("                              a warning will be printed and CPU will be used.\n");
+    printf("                              a warning will be printed and method 3 will be used.\n");
     printf("  --prn <num>                 Search only specified PRN (1-37). If not specified, scan all.\n");
     printf("  --threshold <cn0>           Detection threshold (C/N0 in dB-Hz). (Default: %.1f)\n", DEFAULT_THRESHOLD_DB);
     printf("  -h, --help                  Show this help message.\n");
@@ -177,6 +176,7 @@ static int acquire_batch_prn(
     config.n_dop = n_rows;
     config.num_periods = num_periods;
     config.method = method;
+    config.device = device;
     config.verbose = 0;
     config.num_prns = num_prns;
     
@@ -188,26 +188,13 @@ static int acquire_batch_prn(
     }
 
     // Execute batch correlation
-    int use_gpu = (device == DEVICE_GPU && method == METHOD_PARALLEL_CODE);
-    int ret;
 
-    if (use_gpu) {
-        ret = batch_corr_execute_cuda(
-            (const cuFloatComplex*) signal,
-            local_codes, &config, recv,
-            corr_maps
-        );
-    } else {
-        if (device == DEVICE_GPU) {
-            fprintf(stderr, "Warning: GPU is only implemented for method 3 (Parallel Code Search).\n");
-            fprintf(stderr, "         Falling back to CPU for method %d.\n", method);
-        }
-        ret = batch_corr_execute(
+    int ret;
+    ret = batch_corr_execute(
             signal,
             local_codes, &config, recv,
             corr_maps
         );
-    }
 
     if (ret != 0) {
         fprintf(stderr, "Error: batch_corr_execute failed.\n");

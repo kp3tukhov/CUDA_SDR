@@ -24,7 +24,6 @@
 #include "core/utils.h"
 #include "dsp/code.h"
 #include "correlator/corr_interface.h"
-#include "correlator/corr_interface_gpu.cuh"
 #include "io/file_io.h"
 #include "io/config_io.h"
 
@@ -52,7 +51,7 @@ void print_usage(const char *prog_name) {
     printf("  --device <cpu|gpu>      Execution device (default: cpu).\n");
     printf("                          Note: GPU is only supported for method 3.\n");
     printf("                          If method 1 or 2 is selected with --device gpu,\n");
-    printf("                          a warning will be printed and CPU will be used.\n");
+    printf("                          a warning will be printed and method 3 will be used.\n");
     printf("  -h, --help              Show this help message.\n");
     printf("Example:\n");
     printf("  %s -f test_iq.bin --prn=5 --tint=10 --iq --method=3 --device=gpu -o test.dat \n", prog_name);
@@ -204,6 +203,7 @@ int main(int argc, char *argv[]) {
     config.n_dop = n_rows;
     config.num_periods = num_periods;
     config.method = method;
+    config.device = device;
     config.verbose = 1;
     config.num_prns = 1;
     config.prns[0] = prn;
@@ -214,28 +214,12 @@ int main(int argc, char *argv[]) {
     printf("Starting correlation...\n");
     double t_start_corr = get_time_sec();
 
-    // Check if GPU is requested but method is not parallel code
-    int use_gpu = (device == DEVICE_GPU && method == METHOD_PARALLEL_CODE);
-
     int ret;
-    if (use_gpu) {
-        printf("Using GPU acceleration (method 3 - Parallel Code).\n");
-        ret = batch_corr_execute_cuda(
-            (const cuFloatComplex*) signal_buffer,
-            local_code, &config, &recv,
-            &result_map
-        );
-    } else {
-        if (device == DEVICE_GPU) {
-            fprintf(stderr, "Warning: GPU is only implemented for method 3 (Parallel Code Search).\n");
-            fprintf(stderr, "         Falling back to CPU for method %d.\n", method);
-        }
-        ret = batch_corr_execute(
+    ret = batch_corr_execute(
             signal_buffer,
             local_code, &config, &recv,
             &result_map
         );
-    }
 
     double t_end_corr = get_time_sec();
     printf("[PROFILING] Correlation execution time: %.4f seconds\n", t_end_corr - t_start_corr);

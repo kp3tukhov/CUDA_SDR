@@ -18,7 +18,7 @@
 
 #include "core/params.h"
 #include "core/types.h"
-#include "correlator/corr_interface_gpu.cuh"
+#include "correlator/correlator_gpu.cuh"
 #include "dsp/mixer_gpu.cuh"
 #include "dsp/code_gpu.cuh"
 
