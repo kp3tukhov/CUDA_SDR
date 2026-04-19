@@ -5,74 +5,44 @@
  * performs satellite detection from correlation map
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-
 #include "core/params.h"
 #include "core/types.h"
 #include "acquisition/acq_processor.h"
 #include "acquisition/peak_detection.h"
 #include "acquisition/cn0_estimator.h"
+#include "code/getcode.h"
 
 
 void perform_acquisition(
-    const double *corr_map,
-    int n_doppler,
-    int n_samples,
-    double doppler_min,
-    double doppler_step,
-    int prn,
-    double t_integration,
-    double threshold_db,
-    satellite_channel_t *result
+    satellite_channel_t *sat,
+    double threshold_db
 ) {
-    if (!corr_map || !result) {
+    if (!sat || !sat->acq || !sat->acq->corr_map) {
         return;
     }
 
-    // Initialize channel structure
-    result->prn = prn;
-    result->active = 0;
-    result->fdoppler = 0.0;
-    result->code_phase_start_chips = 0.0;
-    result->carrier_phase_start_rad = 0.0;
-    result->cn0_db_hz = 0.0;
+    acquisition_context_t *acq = sat->acq;
 
     // Find correlation peak
-    correlation_peak_t peak;
-    find_correlation_peak(
-        corr_map, n_doppler, n_samples,
-        doppler_min, doppler_step,
-        &peak
-    );
-
-    result->code_phase_start_chips = peak.code_phase_chips;
-    result->fdoppler = peak.doppler_freq;
+    find_correlation_peak(sat);
 
     // Refine Doppler frequency (parabolic interpolation)
-    double refined_doppler;
-    fine_doppler(
-        corr_map, n_doppler, n_samples,
-        peak.doppler_idx, peak.code_sample,
-        doppler_min, doppler_step,
-        &refined_doppler
-    );
+    double refined_doppler = fine_doppler(acq);
 
-    result->fdoppler = refined_doppler;
+    sat->fdoppler = refined_doppler;
 
     // Estimate noise floor
-    double noise_floor = estimate_noise_floor(corr_map, n_doppler, n_samples);
+    double noise_floor = estimate_noise_floor(acq);
 
     // Estimate C/N0
-    double peak_power = corr_map[peak.doppler_idx * n_samples + peak.code_sample];
-    result->cn0_db_hz = estimate_cn0(
+    double peak_power = acq->corr_map[acq->dop_idx * acq->n_samples + acq->code_sample];
+    double t_int = (double)get_period_ms(sat->sys, sat->sig) / 1000.0;
+    sat->cn0_db_hz = estimate_cn0(
         peak_power,
         noise_floor,
-        t_integration
+        t_int
     );
 
     // Detect satellite aquisition status
-    result->active = (result->cn0_db_hz >= threshold_db) ? 1 : 0;
+    sat->active = (sat->cn0_db_hz >= threshold_db) ? 1 : 0;
 }

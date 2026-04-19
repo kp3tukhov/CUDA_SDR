@@ -7,43 +7,53 @@
  * power accumulation
  */
 
-#ifndef CORR_INTERFACE_GPU_CUH
-#define CORR_INTERFACE_GPU_CUH
-
-#include <cuComplex.h>
-#include "core/types.h"
+#ifndef CORR_CORRELATOR_GPU_CUH
+#define CORR_CORRELATOR_GPU_CUH
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*
- * Execute batch correlation for multiple satellites on GPU
- *
- * This is the main entry point for GPU-based correlation processing
- * It manages all GPU resources, transfers data once, performs correlation
- * with non-coherent accumulation entirely on GPU, and copies results back
+ * Kernel: batched power accumulation across multiple periods, satellites, and Doppler bins
+ * Each thread processes one (period, satellite, Doppler, sample) tuple,
+ * performing atomic addition into the per-(satellite, Doppler, sample) accumulator
  *
  * Parameters:
- *   signal      - Input signal buffer
- *   local_code  - Concatenated PRN codes [num_prns * GPS_CODE_LEN]
- *   config      - Correlator configuration
- *   recv        - Receiver configuration
- *   corr_maps   - Output array of correlation maps [num_prns * n_dop * N]
- *
- * Returns:
- *   0 on success, -1 on error
+ *   d_prod       - [batch_p × num_sats × n_dop × N] input product buffer
+ *   d_accum      - [num_sats × n_dop × N] accumulator buffer
+ *   batch_p      - Actual batch size (may be < PERIODS_PER_BATCH for last batch)
+ *   num_sats     - Number of satellites being processed
+ *   n_dop        - Number of Doppler bins
+ *   N            - Number of samples per period
+ *   fft_size     - FFT size for normalization
  */
-int batch_corr_execute_cuda(
-    const cuFloatComplex *signal,
-    const int8_t *local_code,
-    const correlator_config_t *config,
-    const receiver_t *recv,
-    double **corr_maps
+__global__ void power_accum_batched_kernel(
+    const cuFloatComplex *d_prod,
+    float *d_accum,
+    int batch_p,
+    int num_sats,
+    int n_dop,
+    int N,
+    int fft_size
+);
+
+/*
+ * Run CUDA batch correlation for one satellite channel block
+ * Parallel code-domain search: mixes the signal per Doppler bin and period, FFTs, multiplies
+ * by cached code spectra, inverse FFTs, and accumulates non-coherent power into device maps
+ *
+ * Parameters:
+ *   blk         - Block with RF buffer, per-satellite codes, cuFFT plans, and GPU scratch buffers
+ *   num_periods - Number of code periods in the batch (same dimension as the mixing / FFT batch)
+ */
+int correlate_block_gpu(
+    satellite_channel_block_t *blk,
+    int num_periods
 );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CORR_INTERFACE_GPU_CUH */
+#endif /* CORR_CORRELATOR_GPU_CUH */

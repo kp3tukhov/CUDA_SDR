@@ -9,11 +9,10 @@
 #include <cuda_runtime.h>
 #include <cuComplex.h>
 #include <cufft.h>
-#include <math.h>
-#include <stdio.h>
 
-#include "core/params.h"
-#include "core/types.h"
+#include <stdint.h>
+
+#include "code_gpu.cuh"
 
 
 #ifdef __cplusplus

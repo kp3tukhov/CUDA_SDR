@@ -3,35 +3,29 @@
  * 
  * This header provides functions for frequency mixing (down-conversion)
  * and complex vector operations used in GPS signal processing
- * Includes cached phase lookup table (LUT) for carrier mixing
+ * Includes cached lookup table (LUT) for fast carrier mixing
  */
 
 #ifndef DSP_MIXER_H
 #define DSP_MIXER_H
 
-#include <fftw3.h>
-#include <complex.h>
-#include "core/types.h"
-
-
 /*
  * Mix input signal with a complex exponential at specified frequency
- * Uses a precomputed phase lookup table for efficient carrier generation
- * Warning: quite low precision
+ * Uses a precomputed mixing lookup table for efficient carrier generation
  *
  * Parameters:
- *   signal_in  - Input signal buffer (complex samples)
- *   signal_out - Output buffer for mixed signal
- *   size       - Number of samples to process
- *   freq       - Mixing frequency (Hz)
- *   recv       - Receiver configuration (for sampling rate)
+ *   raw        - Input signal buffer, raw bit-packed 8(4+4)
+ *   mixed      - Output buffer for mixed signal
+ *   fft_size   - Total output size for FFT (zero-padded to this value)
+ *   N          - Number of samples to process
+ *   phase_step - Phase increment per sample (freq/f_adc)
  */
 void mix_freq(
-    const float complex *signal_in,
-    float complex *signal_out,
-    int size,
-    double freq,
-    const receiver_t *recv
+    const uint8_t *raw,
+    float complex *mixed,
+    int fft_size,
+    int N,
+    double phase_step
 );
 
 /*

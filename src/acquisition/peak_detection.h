@@ -8,28 +8,13 @@
 #ifndef ACQUISITION_PEAK_DETECTION_H
 #define ACQUISITION_PEAK_DETECTION_H
 
-#include "core/types.h"
-
-
 /*
- * Find the maximum correlation peak in a correlation map
+ * Find the maximum correlation peak in a correlation map of a satellite
  *
  * Parameters:
- *   corr_map     - Input correlation map (Doppler x Code)
- *   n_doppler    - Number of Doppler bins
- *   n_samples    - Number of code phase samples
- *   doppler_min  - Minimum Doppler frequency (Hz)
- *   doppler_step - Doppler frequency step (Hz)
- *   peak         - Output peak structure
+ *   sat     - Satellite Channel structure
  */
-void find_correlation_peak(
-    const double *corr_map,
-    int n_doppler,
-    int n_samples,
-    double doppler_min,
-    double doppler_step,
-    correlation_peak_t *peak
-);
+void find_correlation_peak(satellite_channel_t *sat);
 
 /*
  * Refine Doppler frequency estimate using parabolic interpolation
@@ -37,24 +22,10 @@ void find_correlation_peak(
  * with sub-bin accuracy. Code phase is held fixed
  *
  * Parameters:
- *   corr_map        - Input correlation map (Doppler x Code)
- *   n_doppler       - Number of Doppler bins
- *   n_samples       - Number of code phase samples
- *   peak_idx        - Doppler bin index of peak
- *   sample_idx      - Code sample index of peak
- *   doppler_min     - Minimum Doppler frequency (Hz)
- *   doppler_step    - Doppler frequency step (Hz)
- *   refined_doppler - Output refined Doppler frequency (Hz)
+ *   acq        - Acquisition Context structure
  */
-void fine_doppler(
-    const double *corr_map,
-    int n_doppler,
-    int n_samples,
-    int peak_idx,
-    int sample_idx,
-    double doppler_min,
-    double doppler_step,
-    double *refined_doppler
+double fine_doppler(
+    acquisition_context_t *acq
 );
 
 #endif /* ACQUISITION_PEAK_DETECTION_H */

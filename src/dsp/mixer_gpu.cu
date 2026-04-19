@@ -9,9 +9,8 @@
 
 #include <cuda_runtime.h>
 #include <cuComplex.h>
-#include <math.h>
+
 #include <stdio.h>
-#include <string.h>
 #include <stdint.h>
 
 #include "core/params.h"
@@ -19,27 +18,39 @@
 #include "dsp/mixer_gpu.cuh"
 
 
-static __device__ cuFloatComplex d_phase_lut[PHASE_LUT_SIZE];
+#define PHASE_LUT_SIZE 256  // 2^8
+#define RAW_SIZE 256        // uint8_t max val
+
+
+static __device__ cuFloatComplex d_mix_lut[RAW_SIZE][PHASE_LUT_SIZE];   // Cached values for all possible raw values (2^8)
 static int lut_initialized = 0;
+
+
+// Unpack raw 8(4+4) to float complex
+static inline cuFloatComplex raw_unpack(uint8_t val) {
+    return make_cuFloatComplex((float)(val & 0xF), (float)(val >> 4));
+}
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-void init_phase_lut_gpu(void) {
+// Initialize mixing lookup table
+void init_mix_lut_gpu(void) {
     if (lut_initialized) return;
 
     cudaError_t err;
-    cuFloatComplex host_lut[PHASE_LUT_SIZE];
+    cuFloatComplex host_lut[RAW_SIZE][PHASE_LUT_SIZE];
 
     for (int i = 0; i < PHASE_LUT_SIZE; i++) {
         double phase = 2.0 * M_PI * i / PHASE_LUT_SIZE;
-        host_lut[i] = make_cuFloatComplex((float)cos(phase), (float)sin(phase));
+        for (int j = 0; j < RAW_SIZE; j++) {
+            host_lut[j][i] = cuCmulf(raw_unpack((uint8_t)j), make_cuFloatComplex((float)cos(phase), (float)sin(phase)));
+        }
     }
 
-    err = cudaMemcpyToSymbol(d_phase_lut, host_lut, sizeof(host_lut));
+    err = cudaMemcpyToSymbol(d_mix_lut, host_lut, sizeof(host_lut));
     if (err != cudaSuccess) {
         fprintf(stderr, "CUDA cudaMemcpyToSymbol error: %s\n", cudaGetErrorString(err));
         return;
@@ -51,16 +62,17 @@ void init_phase_lut_gpu(void) {
 
 __global__ void mix_freq_kernel(
     int size,
-    const cuFloatComplex *signal_in,
+    const uint8_t *signal_in,
     cuFloatComplex *signal_out,
-    uint16_t phase_step_lut
+    double phase_step
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (idx < size) {
-        uint16_t current_phase = (uint16_t)(phase_step_lut * idx); // Overflow wraps phase automatically
+        uint32_t phase_step_lut = (uint32_t)(int)(phase_step * (PHASE_LUT_SIZE << 12));
+        uint8_t current_phase = (uint8_t)((phase_step_lut * idx) >> 12); // Overflow wraps phase automatically
 
-        signal_out[idx] = cuCmulf(signal_in[idx], d_phase_lut[current_phase]);
+        signal_out[idx] = d_mix_lut[signal_in[idx]][current_phase];
     }
 }
 
@@ -117,13 +129,13 @@ __global__ void cpx_sum_kernel(
 
 
 __global__ void mix_batch_kernel(
-    const cuFloatComplex *d_signal,
-    cuFloatComplex *d_mixed,
+    const uint8_t *d_raw,
+    cuFloatComplex *d_mixed, 
     int N,
     int fft_size,
     int n_dop,
     int num_periods,
-    const uint16_t *d_phase_steps
+    const double *d_phase_steps
 ) {
     long idx = (long)blockIdx.x * blockDim.x + threadIdx.x;
     long total = (long)num_periods * n_dop * fft_size;
@@ -136,11 +148,12 @@ __global__ void mix_batch_kernel(
     int sample = remaining % fft_size;
 
     if (sample < N) {
-        uint16_t phase_step = d_phase_steps[doppler];
-        uint16_t current_phase = (uint16_t)(phase_step * sample);
+        uint32_t phase_step_lut = (uint32_t)(int)(d_phase_steps[doppler] * (PHASE_LUT_SIZE << 12));
 
-        const cuFloatComplex *sig_period = d_signal + (long)period * N;
-        d_mixed[idx] = cuCmulf(sig_period[sample], d_phase_lut[current_phase]);
+        uint8_t current_phase = (uint8_t)((phase_step_lut * sample) >> 12);
+
+        const uint8_t *raw_period = d_raw + (long)period * N;
+        d_mixed[idx] = d_mix_lut[raw_period[sample]][current_phase];
     } else {
         d_mixed[idx] = make_cuFloatComplex(0.0f, 0.0f);
     }

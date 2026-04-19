@@ -4,40 +4,36 @@
  * This header provides CUDA kernel declarations for frequency
  * mixing (down-conversion) and complex vector operations used in
  * GPS signal processing on the GPU
- * Includes cached phase lookup table (LUT) for carrier mixing
+ * Includes cached lookup table (LUT) for carrier mixing
  */
 
 #ifndef DSP_MIXER_GPU_H
 #define DSP_MIXER_GPU_H
-
-#include <cuComplex.h>
-
-#define PHASE_LUT_SIZE 65536  // 2^16
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*
- * Initialize the phase lookup table on GPU
+ * Initialize the mixing lookup table on GPU
  * Must be called once before using mix_freq_kernel from other modules
  */
-void init_phase_lut_gpu(void);
+void init_mix_lut_gpu(void);
 
 /*
- * CUDA Kernel: Frequency mixing with a complex exponential
+ * CUDA Kernel: Frequency mixing with a complex exponential at proper frequency
  *
  * Parameters:
  *   size           - Number of samples to process
  *   signal_in      - Input signal buffer (complex samples)
  *   signal_out     - Output buffer for mixed signal
- *   phase_step_lut - Phase increment per sample (scaled to LUT indices)
+ *   phase_step     - Phase increment per sample (freq/f_adc)
  */
 __global__ void mix_freq_kernel(
     int size,
-    const cuFloatComplex *signal_in,
+    const uint8_t *signal_in,
     cuFloatComplex *signal_out,
-    uint16_t phase_step_lut
+    double phase_step
 );
 
 /*
@@ -78,22 +74,22 @@ __global__ void cpx_sum_kernel(
  * Each thread processes one (period, doppler_bin, sample) tuple
  *
  * Parameters:
- *   d_signal       - [num_periods × N] input signal for all periods
+ *   d_raw          - [num_periods × N] input signal for all periods, bit-packed raw 8(4+4)
  *   d_mixed        - [num_periods × n_dop × fft_size] output mixed signal
  *   N              - number of samples in each period
  *   fft_size       - FFT size
  *   n_dop          - number of Doppler bins
  *   num_periods    - number of periods to process in one batch
- *   d_phase_steps  - [n_dop] phase steps for each Doppler bin
+ *   d_phase_steps  - [n_dop] phase steps per sample for each Doppler bin
  */
 __global__ void mix_batch_kernel(
-    const cuFloatComplex *d_signal,
+    const uint8_t *d_raw,
     cuFloatComplex *d_mixed,
     int N,
     int fft_size,
     int n_dop,
     int num_periods,
-    const uint16_t *d_phase_steps
+    const double *d_phase_steps
 );
 
 /*

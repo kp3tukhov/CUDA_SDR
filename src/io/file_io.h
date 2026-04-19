@@ -8,9 +8,22 @@
 #ifndef IO_FILE_IO_H
 #define IO_FILE_IO_H
 
-#include <complex.h>
-#include "core/types.h"
-
+/*
+ * Read signal data from a binary file into raw format
+ * Supports both I-only and IQ formats (int8_t samples)
+ *
+ * Parameters:
+ *   filename  - Path to input binary file
+ *   is_iq     - Non-zero for IQ data, zero for I-only
+ *   buffer    - Raw bit-packed 8(4+4) signal buffer
+ *   n_samples - Number of samples to read
+ */
+void read_raw(
+    const char *filename,
+    int is_iq,
+    uint8_t *buffer,
+    int n_samples
+);
 
 /*
  * Read signal data from a binary file
@@ -19,14 +32,13 @@
  * Parameters:
  *   filename  - Path to input binary file
  *   is_iq     - Non-zero for IQ data, zero for I-only
+ *   buffer    - Complex signal buffer
  *   n_samples - Number of samples to read
- *
- * Returns:
- *   Pointer to complex signal buffer (caller must free), or NULL on error
  */
-float complex* read_signal(
+void read_signal(
     const char *filename,
     int is_iq,
+    float complex *buffer,
     int n_samples
 );
 
@@ -37,16 +49,16 @@ float complex* read_signal(
  * Parameters:
  *   filename     - Path to output text file
  *   data         - Correlation power data (row-major: rows x cols)
- *   doppler_min  - Minimum Doppler frequency (Hz)
- *   doppler_step - Doppler frequency step (Hz)
+ *   dop_min      - Minimum Doppler frequency (Hz)
+ *   dop_step     - Doppler frequency step (Hz)
  *   rows         - Number of Doppler bins
  *   cols         - Number of code samples per Doppler bin
  */
 void write_corr_table(
     const char *filename,
-    double *data,
-    double doppler_min,
-    double doppler_step,
+    float *data,
+    double dop_min,
+    double dop_step,
     int rows,
     int cols
 );

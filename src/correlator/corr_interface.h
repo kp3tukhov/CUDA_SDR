@@ -2,36 +2,35 @@
  * Correlation Interface
  * 
  * This header provides a unified interface for executing batch correlation
- * across multiple satellites
+ * for a satellite block
  */
 
 #ifndef CORRELATOR_INTERFACE_H
 #define CORRELATOR_INTERFACE_H
 
-#include <complex.h>
-#include "core/types.h"
-
-
 /*
- * Execute batch correlation for multiple satellites
- * This is the main entry point for correlation processing
+ * Process every satellite channel block in a receiver
+ * Dispatches batch correlation for each block using that block's correlator configuration
  *
  * Parameters:
- *   signal      - Input signal buffer (complex samples)
- *   local_code  - Concatenated PRN codes [num_prns * GPS_CODE_LEN]
- *   config      - Correlator configuration
- *   recv        - Receiver configuration
- *   corr_maps   - Output array of correlation maps [num_prns * nrows * ncols]
- *
- * Returns:
- *   0 on success, -1 on error
+ *   rcv - Receiver context (blocks and RF channel)
  */
-int batch_corr_execute(
-    const float complex *signal,
-    const int8_t *local_code,
-    const correlator_config_t *config,
-    const receiver_t *recv,
-    double **corr_maps
+int process_receiver(
+    GNSSReceiver_t *rcv
+);
+
+/*
+ * Run batch correlation for one satellite channel block
+ * Uses the GPU path when blk->config.device requests it; otherwise runs the CPU
+ * correlator (sequential, parallel frequency, or parallel code) with non-coherent accumulation
+ *
+ * Parameters:
+ *   blk         - Block with RF samples, satellite channels, and correlator configuration
+ *   num_periods - Number of code periods to process (GPU batch size; CPU path uses cfg in blk)
+ */
+int process_block(
+    satellite_channel_block_t *blk,
+    int num_periods
 );
 
 #endif /* CORRELATOR_INTERFACE_H */

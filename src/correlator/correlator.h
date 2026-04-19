@@ -10,11 +10,6 @@
 #ifndef CORRELATOR_H
 #define CORRELATOR_H
 
-#include <complex.h>
-#include <fftw3.h>
-#include "core/types.h"
-
-
 /*
  * Perform sequential time-domain correlation
  * Iterates through all code phases and Doppler frequencies sequentially
@@ -22,18 +17,25 @@
  * Parameters:
  *   signal     - Input signal buffer (complex samples)
  *   local_code - Generated local PRN code (+1/-1 values)
- *   recv       - Receiver configuration
+ *   code_len   - Length of the code sequence (chips)
+ *   N          - Number of valid samples in one code period
+ *   chiprate   - Chip rate in the GNSS signal
+ *   carrier    - Carrier frequency of the GNSS signal
+ *   rf_ch      - Receiver RF channel
  *   cfg        - Correlator configuration
  *   corr_map   - Output correlation map (Doppler x Code)
  */
 void corr_sequential(
-    const float complex *signal,
+    const uint8_t *raw,
     const int8_t *local_code,
-    const receiver_t *recv,
+    int code_len,
+    int N,
+    double chiprate,
+    double carrier,
+    const RF_channel_t *rf_ch,
     const correlator_config_t *cfg,
-    double *corr_map
+    float *corr_map
 );
-
 
 /*
  * Perform parallel frequency-domain correlation (XF)
@@ -42,18 +44,25 @@ void corr_sequential(
  * Parameters:
  *   signal     - Input signal buffer (complex samples)
  *   local_code - Generated local PRN code (+1/-1 values)
- *   recv       - Receiver configuration
+ *   code_len   - Length of the code sequence (chips)
+ *   N          - Number of valid samples in one code period
+ *   chiprate   - Chip rate in the GNSS signal
+ *   carrier    - Carrier frequency of the GNSS signal
+ *   rf_ch      - Receiver RF channel
  *   cfg        - Correlator configuration
  *   corr_map   - Output correlation map (Doppler x Code)
  */
 void corr_parallel_freq(
-    const float complex *signal,
+    const uint8_t *raw,
     const int8_t *local_code,
-    const receiver_t *recv,
+    int code_len,
+    int N,
+    double chiprate,
+    double carrier,
+    const RF_channel_t *rf_ch,
     const correlator_config_t *cfg,
-    double *corr_map
+    float *corr_map
 );
-
 
 /*
  * Perform parallel code-domain correlation (FX)
@@ -62,16 +71,24 @@ void corr_parallel_freq(
  * Parameters:
  *   signal     - Input signal buffer (complex samples)
  *   local_code - Generated local PRN code (+1/-1 values)
- *   recv       - Receiver configuration
+ *   code_len   - Length of the code sequence (chips)
+ *   N          - Number of valid samples in one code period
+ *   chiprate   - Chip rate in the GNSS signal
+ *   carrier    - Carrier frequency of the GNSS signal
+ *   rf_ch      - Receiver RF channel
  *   cfg        - Correlator configuration
  *   corr_map   - Output correlation map (Doppler x Code)
  */
 void corr_parallel_code(
-    const float complex *signal,
+    const uint8_t *raw,
     const int8_t *local_code,
-    const receiver_t *recv,
+    int code_len,
+    int N,
+    double chiprate,
+    double carrier,
+    const RF_channel_t *rf_ch,
     const correlator_config_t *cfg,
-    double *corr_map
+    float *corr_map
 );
 
 #endif /* CORRELATOR_H */

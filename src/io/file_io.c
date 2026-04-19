@@ -9,66 +9,94 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <complex.h>
+
 #include "io/file_io.h"
 
 
-float complex* read_signal(
+void read_raw(
     const char *filename,
     int is_iq,
+    uint8_t *buffer,
     int n_samples
 ) {
-    size_t buffer_size = n_samples * (is_iq ? 2 : 1);
+    size_t read_size = n_samples * (is_iq ? 2 : 1);
 
-    int8_t *raw_data = (int8_t*)malloc(buffer_size);
-    if (!raw_data) {
+    int8_t *data = (int8_t*)malloc(read_size);
+    if (!data) {
         fprintf(stderr, "Error: Failed to allocate memory for input buffer.\n");
-        return NULL;
+        return;
     }
-
 
     FILE *fp = fopen(filename, "rb");
     if (!fp) {
         perror("Error opening input file");
-        free(raw_data);
-        return NULL;
+        free(data);
+        return;
     }
 
-    fread(raw_data, 1, buffer_size, fp);
+    fread(data, 1, read_size, fp);
     fclose(fp);
-
-    // Allocate complex signal buffer
-    float complex *signal_buffer = (float complex*)malloc(sizeof(float complex) * n_samples);
-    if (!signal_buffer) {
-        fprintf(stderr, "Error: Failed to allocate signal buffer.\n");
-        free(raw_data);
-        return NULL;
-    }
 
     if (is_iq) {
         for (int i = 0; i < n_samples; i++) {
-            signal_buffer[i] = (float)raw_data[2*i] + I * (float)raw_data[2*i + 1];
+            buffer[i] = (uint8_t)((data[2*i + 1] << 4) | (data[2*i]& 0xF));
         }
     } else {
         for (int i = 0; i < n_samples; i++) {
-            signal_buffer[i] = (float)raw_data[i] + I * 0.0f;
+            buffer[i] = (uint8_t)(data[i] & 0xF);
         }
     }
 
-    free(raw_data);
+    free(data);
+}
 
-    return signal_buffer;
+
+void read_signal(
+    const char *filename,
+    int is_iq,
+    float complex *buffer,
+    int n_samples
+) {
+    size_t read_size = n_samples * (is_iq ? 2 : 1);
+
+    int8_t *data = (int8_t*)malloc(read_size);
+    if (!data) {
+        fprintf(stderr, "Error: Failed to allocate memory for input buffer.\n");
+        return;
+    }
+
+    FILE *fp = fopen(filename, "rb");
+    if (!fp) {
+        perror("Error opening input file");
+        free(data);
+        return;
+    }
+
+    fread(data, 1, read_size, fp);
+    fclose(fp);
+
+    if (is_iq) {
+        for (int i = 0; i < n_samples; i++) {
+            buffer[i] = (float)data[2*i] + I * (float)data[2*i + 1];
+        }
+    } else {
+        for (int i = 0; i < n_samples; i++) {
+            buffer[i] = (float)data[i] + I * 0.0f;
+        }
+    }
+
+    free(data);
 }
 
 
 void write_corr_table(
     const char *filename,
-    double *data,
-    double doppler_min,
-    double doppler_step,
+    float *data,
+    double dop_min,
+    double dop_step,
     int rows,
     int cols
 ) {
-    // Write correlation results to file
     FILE *fp = fopen(filename, "w");
     if (!fp) {
         perror("Error opening output file");
@@ -78,7 +106,7 @@ void write_corr_table(
     fprintf(fp, "# Doppler_Hz\tCode_Sample\tPower\n");
 
     for (int r = 0; r < rows; r++) {
-        double current_doppler = doppler_min + r * doppler_step;
+        double current_doppler = dop_min + r * dop_step;
         for (int c = 0; c < cols; c++) {
             double power = data[r * cols + c];
             fprintf(fp, "%.2f\t%d\t%.6f\n", current_doppler, c, power);
@@ -86,5 +114,4 @@ void write_corr_table(
     }
 
     fclose(fp);
-    printf("Results saved to %s\n", filename);
 }

@@ -5,28 +5,25 @@
  * refining Doppler frequency estimates using parabolic interpolation.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <math.h>
 
 #include "core/params.h"
 #include "core/types.h"
 #include "acquisition/peak_detection.h"
-#include "acquisition/cn0_estimator.h"
+#include "code/getcode.h"
 
 
 /*
  * Converts correlation sample index to code phase in chips
  */
-static inline double sample_to_chip_phase(int sample_idx, int n_samples) {
+static inline double sample_to_chip_phase(int sample_idx, int n_samples, int code_len) {
     if (n_samples <= 0) return 0.0;
 
-    double chips_per_sample = (double)GPS_CODE_LEN / (double)n_samples;
+    double chips_per_sample = (double)code_len / (double)n_samples;
     double phase = (double)sample_idx * chips_per_sample;
 
-    while (phase >= GPS_CODE_LEN) {
-        phase -= GPS_CODE_LEN;
+    while (phase >= code_len) {
+        phase -= code_len;
     }
 
     return phase;
@@ -66,32 +63,22 @@ static double parabolic_interp_1d(
 
 
 void find_correlation_peak(
-    const double *corr_map,
-    int n_doppler,
-    int n_samples,
-    double doppler_min,
-    double doppler_step,
-    correlation_peak_t *peak
+    satellite_channel_t *sat
 ) {
-    if (!corr_map || !peak || n_doppler <= 0 || n_samples <= 0) {
+    if (!sat || !sat->acq || !sat->acq->corr_map) {
         return;
     }
 
-    // Initialize peak structure
-    peak->doppler_idx = 0;
-    peak->code_sample = 0;
-    peak->power = corr_map[0];
-    peak->doppler_freq = doppler_min;
-    peak->code_phase_chips = 0.0;
+    acquisition_context_t *acq = sat->acq;
 
     // Global maximum search
     double max_power = 0.0;
     int max_doppler_idx = 0;
     int max_sample_idx = 0;
 
-    for (int d = 0; d < n_doppler; d++) {
-        for (int s = 0; s < n_samples; s++) {
-            double power = corr_map[d * n_samples + s];
+    for (int d = 0; d < acq->n_dop; d++) {
+        for (int s = 0; s < acq->n_samples; s++) {
+            double power = acq->corr_map[d * acq->n_samples + s];
             if (power > max_power) {
                 max_power = power;
                 max_doppler_idx = d;
@@ -101,47 +88,41 @@ void find_correlation_peak(
     }
 
     // Fill result structure
-    peak->doppler_idx = max_doppler_idx;
-    peak->code_sample = max_sample_idx;
-    peak->power = max_power;
+    acq->dop_idx = max_doppler_idx;
+    acq->code_sample = max_sample_idx;
+    acq->power = max_power;
 
     // Compute Doppler frequency
-    peak->doppler_freq = doppler_min + max_doppler_idx * doppler_step;
-
+    sat->fdoppler = acq->dop_min + acq->dop_idx * acq->dop_step;
+ 
     // Compute code phase in chips
-    peak->code_phase_chips = sample_to_chip_phase(max_sample_idx, n_samples);
+    int code_len = get_code_len(sat->sys, sat->sig);
+    sat->code_phase_start_chips = sample_to_chip_phase(max_sample_idx, acq->n_samples, code_len);
 }
 
 
-void fine_doppler(
-    const double *corr_map,
-    int n_doppler,
-    int n_samples,
-    int peak_idx,
-    int sample_idx,
-    double doppler_min,
-    double doppler_step,
-    double *refined_doppler
+double fine_doppler(
+    acquisition_context_t *acq
 ) {
-    if (!corr_map || !refined_doppler) {
-        return;
+    if (!acq || !acq->corr_map) {
+        return 0;
     }
 
     // Base values
-    double base_doppler = doppler_min + peak_idx * doppler_step;
-    double base_power = corr_map[peak_idx * n_samples + sample_idx];
+    double base_doppler = acq->dop_min + acq->dop_idx * acq->dop_step;
+    double base_power = acq->corr_map[acq->dop_idx * acq->n_samples + acq->code_sample];
 
     // Doppler interpolation (3 points vertically)
-    int doppler_prev = (peak_idx > 0) ? peak_idx - 1 : peak_idx;
-    int doppler_next = (peak_idx < n_doppler - 1) ? peak_idx + 1 : peak_idx;
+    int doppler_prev = (acq->dop_idx > 0) ? acq->dop_idx - 1 : acq->dop_idx;
+    int doppler_next = (acq->dop_idx < acq->n_dop - 1) ? acq->dop_idx + 1 : acq->dop_idx;
 
-    double y_minus = corr_map[doppler_prev * n_samples + sample_idx];
+    double y_minus = acq->corr_map[doppler_prev * acq->n_samples + acq->code_sample];
     double y_center = base_power;
-    double y_plus = corr_map[doppler_next * n_samples + sample_idx];
+    double y_plus = acq->corr_map[doppler_next * acq->n_samples + acq->code_sample];
 
     double doppler_offset = 0.0;
     parabolic_interp_1d(y_minus, y_center, y_plus, &doppler_offset);
 
     // Refined Doppler frequency
-    *refined_doppler = base_doppler + doppler_offset * doppler_step;
+    return base_doppler + doppler_offset * acq->dop_step;
 }

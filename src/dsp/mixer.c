@@ -3,32 +3,41 @@
  * 
  * This module provides functions for frequency mixing (down-conversion)
  * and complex vector operations used in GPS signal processing
- * Includes cached phase lookup table (LUT) for carrier mixing
+ * Includes cached lookup table (LUT) for carrier mixing
  */
 
 #include <math.h>
 #include <stdint.h>
-#include <string.h>
 #include <complex.h>
 
+#include <stdio.h>
 #include "core/params.h"
 #include "core/types.h"
 #include "dsp/mixer.h"
 
 
-#define PHASE_LUT_SIZE 65536  // 2^16
+#define PHASE_LUT_SIZE 256  // 2^8
+#define RAW_SIZE 256        // uint8_t max val
 
-static float complex phase_lut[PHASE_LUT_SIZE];
+
+static float complex mix_lut[RAW_SIZE][PHASE_LUT_SIZE];   // Cached values for all possible raw values (2^8)
 static int lut_initialized = 0;
 
 
-// Initialize phase lookup table
-static inline void init_phase_lut(void) {
+// Unpack raw 8(4+4) to float complex
+static inline float complex raw_unpack(uint8_t val) {
+    return (float)(val & 0xF) + I * (float)(val >> 4);
+}
+
+// Initialize mixing lookup table
+static inline void init_mix_lut(void) {
     if (lut_initialized) return;
 
     for (int i = 0; i < PHASE_LUT_SIZE; i++) {
         double phase = 2.0 * M_PI * i / PHASE_LUT_SIZE;
-        phase_lut[i] = cosf((float)phase) + I * sinf((float)phase);
+        for (int j = 0; j < RAW_SIZE; j++) {
+            mix_lut[j][i] = raw_unpack((uint8_t)j)*(cosf((float)phase) + I * sinf((float)phase));
+        }
     }
 
     lut_initialized = 1;
@@ -36,22 +45,25 @@ static inline void init_phase_lut(void) {
 
 
 void mix_freq(
-    const float complex *signal_in,
-    float complex *signal_out,
-    int size,
-    double freq,
-    const receiver_t *recv
+    const uint8_t *raw,
+    float complex *mixed,
+    int fft_size,
+    int N,
+    double phase_step
 ) {
-    init_phase_lut();
+    init_mix_lut();
 
-    // Phase increment per sample (scaled to LUT indices)
-    uint16_t phase_step_lut = (uint16_t)round((freq / recv->f_adc) * PHASE_LUT_SIZE);
+    // Phase increment per sample in LUT indices (rescaled by 2^12)
+    uint32_t phase_step_lut = (uint32_t)(int)(phase_step * (PHASE_LUT_SIZE << 12));
 
-    for (int i = 0; i < size; i++) {
-        uint16_t current_phase = (uint16_t)(phase_step_lut * i); // Overflow wraps phase automatically
+    int i = 0;
+    for (; i < N; i++) {
+        uint8_t current_phase = (uint8_t)((phase_step_lut * i) >> 12); // Overflow wraps phase automatically
         
-        signal_out[i] = signal_in[i]*phase_lut[current_phase];
-
+        mixed[i] = mix_lut[raw[i]][current_phase];  // Get value from LUT
+    }
+    for(; i < fft_size; i++) {
+        mixed[i] = 0.0f + I * 0.0f;
     }
 }
 

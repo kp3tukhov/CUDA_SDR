@@ -8,19 +8,17 @@
 #ifndef IO_CONFIG_IO_H
 #define IO_CONFIG_IO_H
 
-#include "core/types.h"
-
-
 /*
- * Read receiver configuration from a file
+ * Read RF channel configuration from a file
  * Parses key-value pairs (e.g., F_ADC = 8.0e6)
  *
  * Parameters:
  *   filename - Path to configuration file
+ *   buffsize - Size of a buffer to be allocated for channel data
  *
  * Returns:
- *   receiver_t structure with parsed values (defaults used for missing params)
+ *   RF_channel_t* pointer to the allocated structure with parsed values (defaults used for missing params)
  */
-receiver_t read_receiver_config(const char *filename);
+RF_channel_t *read_receiver_config(const char *filename, int buffsize);
 
 #endif /* IO_CONFIG_IO_H */

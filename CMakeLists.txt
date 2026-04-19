@@ -49,6 +49,13 @@ set(CORE_SRCS
 # === Исходники CORE CUDA ===
 set(CORE_CUDA_SRCS
     ${SRC_DIR}/core/init_gpu.cu
+    ${SRC_DIR}/core/rcv.cu
+)
+
+# === Исходники CODE ===
+set(CODE_SRCS
+    ${SRC_DIR}/code/code_gps.c
+    ${SRC_DIR}/code/getcode.c
 )
 
 # === Исходники DSP ===
@@ -89,7 +96,7 @@ set(ACQ_SRCS
 
 # === CUDA библиотека (отдельная static library) ===
 # Важно: CUDA файлы должны компилироваться отдельно
-add_library(cuda_mixers STATIC ${DSP_CUDA_SRCS} ${CORR_CUDA_SRCS})
+add_library(cuda_mixers STATIC ${CORE_CUDA_SRCS} ${DSP_CUDA_SRCS} ${CORR_CUDA_SRCS} )
 set_target_properties(cuda_mixers PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     POSITION_INDEPENDENT_CODE ON
@@ -101,16 +108,22 @@ target_link_libraries(cuda_mixers PUBLIC CUDA::cufft)
 # === gen_sig (без CUDA) ===
 add_executable(gen_sig
     ${APP_DIR}/gen_sig.c
-    ${DSP_SRCS}
+    ${CODE_SRCS}
     ${IO_SRCS}
     ${CORE_SRCS}
 )
-target_link_libraries(gen_sig ${FFTW3F_LIB} ${MATH_LIB})
+target_link_libraries(gen_sig
+    cuda_mixers
+    ${FFTW3F_LIB}
+    ${MATH_LIB}
+    CUDA::cudart
+)
 
 # === corr_sig (с CUDA) ===
 add_executable(corr_sig
     ${APP_DIR}/corr_sig.c
     ${CORR_SRCS}
+    ${CODE_SRCS}
     ${DSP_SRCS}
     ${IO_SRCS}
     ${CORE_SRCS}
@@ -128,6 +141,7 @@ add_executable(acq_sig
     ${ACQ_SRCS}
     ${CORR_SRCS}
     ${DSP_SRCS}
+    ${CODE_SRCS}
     ${IO_SRCS}
     ${CORE_SRCS}
 )

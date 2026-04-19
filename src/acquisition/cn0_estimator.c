@@ -5,9 +5,6 @@
  * maps, including noise floor estimation and sample-to-chip conversion
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <math.h>
 
 #include "core/params.h"
@@ -16,19 +13,17 @@
 
 
 double estimate_noise_floor(
-    const double *corr_map,
-    int n_doppler,
-    int n_samples
+    acquisition_context_t *acq
 ) {
-    if (!corr_map || n_doppler <= 0 || n_samples <= 0) {
+    if (!acq || !acq->corr_map) {
         return 0.0;
     }
 
-    int N = n_doppler * n_samples;
+    int N = acq->n_dop * acq->n_samples;
 
     double sum = 0.0;
     for (int i = 0; i < N; i++) {
-        sum += corr_map[i];
+        sum += acq->corr_map[i];
     }
 
     return sum / N;
@@ -38,9 +33,9 @@ double estimate_noise_floor(
 double estimate_cn0(
     double peak_power,
     double noise_floor,
-    double t_integration
+    double t_int
 ) {
-    if (peak_power <= 0 || noise_floor <= 0 || t_integration <= 0) {
+    if (peak_power <= 0 || noise_floor <= 0) {
         return 0.0;
     }
 
@@ -51,9 +46,7 @@ double estimate_cn0(
         return 0.0;
     }
 
-    double t_period = CODE_PERIOD_MS / 1000.0;
-
-    double cn0 = 10.0 * log10((snr - 1.0) / t_period);
+    double cn0 = 10.0 * log10((snr - 1.0) / t_int);
 
     return cn0;
 }

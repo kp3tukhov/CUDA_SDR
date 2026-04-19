@@ -5,20 +5,22 @@
 
 #define CUDA_BLOCK_SIZE 512         // Default thread block size for GPU
 
+#define MAXCHPERBLOCK 64
+#define MAXBLOCKS 4
+#define MAXCHANNELS (MAXCHPERBLOCK*MAXBLOCKS)
+
+
+
+
 
 /* 
  * ============================================================================
  * GPS SATELLITES L1CA
  * ============================================================================
  */
-
-#define GPS_CODE_LEN 1023      // Number of chips in GPS L1CA code
-#define FS_GPS 1.023e6         // Chip rate GPS L1CA (Hz)
-#define F_GPS_L1 1575.420e6    // Carrier frequency GPS L1 (Hz)
-
-// Code period in milliseconds
-#define CODE_PERIOD_MS (GPS_CODE_LEN * 1000 / FS_GPS)
-
+#define G_L1CA_CLEN 1023      // Number of chips in GPS L1CA code
+#define G_L1CA_CRATE 1.023e6  // Chip rate GPS L1CA (Hz)
+#define G_L1_CARR 1575.420e6  // Carrier frequency GPS L1 (Hz)
 
 #define MAX_SATS 37            // Maximum PRN number (1-37)
 

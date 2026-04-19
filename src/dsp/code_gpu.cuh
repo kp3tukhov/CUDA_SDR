@@ -9,9 +9,6 @@
 #ifndef DSP_CODE_GPU_CUH
 #define DSP_CODE_GPU_CUH
 
-#include <cuComplex.h>
-#include <cufft.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -57,13 +54,13 @@ __global__ void conjugate_kernel(
  * Each thread processes one sample for one satellite.
  *
  * Parameters:
- *   d_codes    - [num_sats x GPS_CODE_LEN] input code sequences
- *   d_out      - [num_sats x fft_size] output sampled codes
- *   num_sats   - number of satellites
- *   N          - number of valid samples in one code period
+ *   d_codes    - [num_sats x GPS_CODE_LEN] Input code sequences
+ *   d_out      - [num_sats x fft_size] Output sampled codes
+ *   num_sats   - Number of satellites
+ *   N          - Number of valid samples in one code period
  *   fft_size   - FFT size (with possible zero-padding)
- *   chip_step  - code phase increment per ADC sample
- *   code_len   - length of the code sequence (chips)
+ *   chip_step  - Code phase increment per ADC sample
+ *   code_len   - Length of the code sequence (chips)
  */
 __global__ void sample_code_batched_kernel(
     const int8_t *d_codes,

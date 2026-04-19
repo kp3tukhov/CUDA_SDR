@@ -8,23 +8,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "core/params.h"
 #include "core/types.h"
 #include "io/config_io.h"
+#include "core/rcv.cuh"
 
 
-receiver_t read_receiver_config(const char *filename) {
-    receiver_t cfg;
+RF_channel_t *read_receiver_config(const char *filename, int buffsize) {
+    
     // Default values
-    cfg.f_adc = RECV_F_ADC;
-    cfg.f_bw = RECV_F_BW;
-    cfg.f_lo = RECV_F_LO;
-    cfg.f_if = F_GPS_L1 - cfg.f_lo;
+    RF_channel_t *rf_ch = new_rf_ch(RECV_F_ADC, RECV_F_BW, RECV_F_LO, 1, buffsize);
 
     FILE *fp = fopen(filename, "r");
     if (!fp) {
         perror("Error opening receiver config file");
-        return cfg;
+        return rf_ch;
     }
 
     char line[256];
@@ -44,19 +43,18 @@ receiver_t read_receiver_config(const char *filename) {
 
             double val = strtod(value, NULL);
             if (strcmp(param, "F_ADC") == 0) {
-                cfg.f_adc = val;
+                rf_ch->f_adc = val;
             } else if (strcmp(param, "F_BW") == 0) {
-                cfg.f_bw = val;
+                rf_ch->f_bw = val;
             } else if (strcmp(param, "F_LO") == 0) {
-                cfg.f_lo = val;
+                rf_ch->f_lo = val;
             }
             else if (strcmp(param, "IQ") == 0) {
-                cfg.iq = (int)val;
+                rf_ch->iq = (int)val;
             }
         }
     }
     fclose(fp);
 
-    cfg.f_if = F_GPS_L1 - cfg.f_lo;
-    return cfg;
+    return rf_ch;
 }

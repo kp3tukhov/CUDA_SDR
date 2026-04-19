@@ -17,7 +17,7 @@
 
 #include "core/params.h"
 #include "core/types.h"
-#include "dsp/code.h"
+#include "code/getcode.h"
 #include "io/config_io.h"
 
 #ifndef M_PI
@@ -70,7 +70,7 @@ void generate_L1CA_signal(
     int num_sats,
     int duration_ms,
     const char *filename,
-    const receiver_t *recv
+    const RF_channel_t *rf_ch
 ) {
     FILE *fp = fopen(filename, "wb");
     if (!fp) {
@@ -78,12 +78,12 @@ void generate_L1CA_signal(
         return;
     }
 
-    static int8_t prn_codes[MAX_SATS][GPS_CODE_LEN];
+    static int8_t prn_codes[MAX_SATS][G_L1CA_CLEN];
 
     int active_count = 0;
     for (int i = 0; i < num_sats; i++) {
         if (sats[i].active && sats[i].prn >= 1 && sats[i].prn <= 37) {
-            gen_code_L1CA(sats[i].prn, prn_codes[sats[i].prn - 1], GPS_CODE_LEN, 0);
+            get_code(SYS_GPS, SIG_L1CA, sats[i].prn, prn_codes[sats[i].prn - 1]);
             active_count++;
         }
     }
@@ -94,15 +94,15 @@ void generate_L1CA_signal(
         return;
     }
 
-    int total_samples = (int)(recv->f_adc * duration_ms / 1000.0);
-    double dt = 1.0 / recv->f_adc;
+    int total_samples = (int)(rf_ch->f_adc * duration_ms / 1000.0);
+    double dt = 1.0 / rf_ch->f_adc;
     double sigma_noise = 1.0;
 
     double current_carrier_phase[MAX_SATS];
     double current_chip_index[MAX_SATS];
     double phase_step_carrier[MAX_SATS];
     double signal_amplitude[MAX_SATS];
-    double chip_step = FS_GPS / recv->f_adc;
+    double chip_step = G_L1CA_CRATE / rf_ch->f_adc;
 
     for (int i = 0; i < num_sats; i++) {
         if (!sats[i].active) continue;
@@ -110,16 +110,17 @@ void generate_L1CA_signal(
         int idx = sats[i].prn - 1;
 
         double cn0_lin = pow(10.0, sats[i].cn0_db_hz / 10.0);
-        signal_amplitude[idx] = sqrt(cn0_lin / recv->f_bw) * sigma_noise;
+        signal_amplitude[idx] = sqrt(cn0_lin / rf_ch->f_bw) * sigma_noise;
 
-        double carrier_freq = recv->f_if + sats[i].fdoppler;
+        double f_if = G_L1_CARR - rf_ch->f_lo;
+        double carrier_freq = f_if + sats[i].fdoppler;
         phase_step_carrier[idx] = 2.0 * M_PI * carrier_freq * dt;
 
         current_carrier_phase[idx] = sats[i].carrier_phase_start_rad;
 
         current_chip_index[idx] = sats[i].code_phase_start_chips;
-        while (current_chip_index[idx] >= GPS_CODE_LEN) current_chip_index[idx] -= GPS_CODE_LEN;
-        while (current_chip_index[idx] < 0) current_chip_index[idx] += GPS_CODE_LEN;
+        while (current_chip_index[idx] >= G_L1CA_CLEN) current_chip_index[idx] -= G_L1CA_CLEN;
+        while (current_chip_index[idx] < 0) current_chip_index[idx] += G_L1CA_CLEN;
     }
 
     printf("Generating MULTI-SAT signal (%d active sats, %d ms)...\n", active_count, duration_ms);
@@ -151,13 +152,13 @@ void generate_L1CA_signal(
             if (current_carrier_phase[prn_idx] < 0) current_carrier_phase[prn_idx] += 2.0 * M_PI;
 
             current_chip_index[prn_idx] += chip_step;
-            if (current_chip_index[prn_idx] >= GPS_CODE_LEN) current_chip_index[prn_idx] -= GPS_CODE_LEN;
+            if (current_chip_index[prn_idx] >= G_L1CA_CLEN) current_chip_index[prn_idx] -= G_L1CA_CLEN;
         }
 
         double i_raw = i_sum + gaussian_noise(sigma_noise);
         double q_raw = q_sum + gaussian_noise(sigma_noise);
 
-        if (recv->iq) {
+        if (rf_ch->iq) {
             int8_t i_digit = quantize_2bit(i_raw, sigma_noise);
             int8_t q_digit = quantize_2bit(q_raw, sigma_noise);
             fwrite(&i_digit, sizeof(int8_t), 1, fp);
@@ -236,7 +237,6 @@ void print_usage(const char *prog_name) {
     printf("  -d, --duration <ms>      Signal duration in milliseconds (integer).\n");
     printf("  -o, --output <file>      Path to the output binary file.\n\n");
     printf("Optional arguments:\n");
-    printf("  -m, --mode <mode>        Output mode: 'i' (I-channel only, default) or 'iq'.\n");
     printf("  -h, --help               Show this help message.\n\n");
     printf("Config file format (space-separated, one satellite per line):\n");
     printf("  PRN  DOPPLER_HZ  CODE_PHASE_CHIPS  CARRIER_PHASE_RAD  CN0_DB_HZ\n");
@@ -249,13 +249,11 @@ int main(int argc, char *argv[]) {
     char *config_file = NULL;
     char *output_file = NULL;
     int duration_ms = 0;
-    int mode_iq = 0;
 
     static struct option long_options[] = {
         {"config",   required_argument, 0, 'f'},
         {"duration", required_argument, 0, 'd'},
         {"output",   required_argument, 0, 'o'},
-        {"mode",     required_argument, 0, 'm'},
         {"help",     no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
@@ -263,7 +261,7 @@ int main(int argc, char *argv[]) {
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long(argc, argv, "f:d:o:m:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:d:o:h", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'f':
                 config_file = optarg;
@@ -273,16 +271,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'o':
                 output_file = optarg;
-                break;
-            case 'm':
-                if (strcmp(optarg, "i") == 0 || strcmp(optarg, "I") == 0) {
-                    mode_iq = 0;
-                } else if (strcmp(optarg, "iq") == 0 || strcmp(optarg, "IQ") == 0) {
-                    mode_iq = 1;
-                } else {
-                    fprintf(stderr, "Error: Invalid mode '%s'. Use 'iq' or 'i'.\n", optarg);
-                    return EXIT_FAILURE;
-                }
                 break;
             case 'h':
                 print_usage(argv[0]);
@@ -314,13 +302,12 @@ int main(int argc, char *argv[]) {
 
     printf("Found %d valid satellite(s).\n", num_sats);
 
-    receiver_t recv = read_receiver_config(RECV_CONFIG_FILE);
-    recv.iq = mode_iq;
+    RF_channel_t *rf_ch = read_receiver_config(RECV_CONFIG_FILE, 65536);
 
     printf("Receiver config: F_ADC=%.2f MHz, F_BW=%.2f MHz, F_LO=%.3f MHz, F_IF=%.2f MHz\n",
-           recv.f_adc / 1e6, recv.f_bw / 1e6, recv.f_lo / 1e6, recv.f_if / 1e6);
+           rf_ch->f_adc / 1e6, rf_ch->f_bw / 1e6, rf_ch->f_lo / 1e6, (G_L1_CARR - rf_ch->f_lo) / 1e6);
 
-    generate_L1CA_signal(sats, num_sats, duration_ms, output_file, &recv);
+    generate_L1CA_signal(sats, num_sats, duration_ms, output_file, rf_ch);
 
     return EXIT_SUCCESS;
 }
