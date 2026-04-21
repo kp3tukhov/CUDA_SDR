@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(GPS_Signal_Processing C CUDA)
+project(GNSS_Signal_Processing C CUDA)
 
 # Стандарты языков
 set(CMAKE_C_STANDARD 11)
@@ -105,20 +105,6 @@ set_target_properties(cuda_mixers PROPERTIES
 target_include_directories(cuda_mixers PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_link_libraries(cuda_mixers PUBLIC CUDA::cufft)
 
-# === gen_sig (без CUDA) ===
-add_executable(gen_sig
-    ${APP_DIR}/gen_sig.c
-    ${CODE_SRCS}
-    ${IO_SRCS}
-    ${CORE_SRCS}
-)
-target_link_libraries(gen_sig
-    cuda_mixers
-    ${FFTW3F_LIB}
-    ${MATH_LIB}
-    CUDA::cudart
-)
-
 # === corr_sig (с CUDA) ===
 add_executable(corr_sig
     ${APP_DIR}/corr_sig.c
@@ -153,6 +139,6 @@ target_link_libraries(acq_sig
 )
 
 # Вывод исполняемых файлов в корневую директорию
-set_target_properties(gen_sig corr_sig acq_sig PROPERTIES
+set_target_properties(corr_sig acq_sig PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
